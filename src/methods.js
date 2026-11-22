@@ -12,7 +12,7 @@
 import { domain, bidHash, resultHash, coinHash, mintHash, sign, recover, keccak, bytesToHex, addressOf } from './sign.js';
 
 const enc = new TextEncoder();
-export const ALLOWED = new Set(['attestResult', 'isSettled', 'paypalCreateOrder', 'paypalCapture', 'paypalWebhook', 'mintVoucher', 'signerAddress']);
+export const ALLOWED = new Set(['setConfig', 'attestResult', 'isSettled', 'paypalCreateOrder', 'paypalCapture', 'paypalWebhook', 'mintVoucher', 'signerAddress']);
 const isAddr = (a) => /^0x[0-9a-fA-F]{40}$/.test(String(a));
 
 export const createOnce = async (B, key, v) => (await B.put(key, JSON.stringify(v), { httpMetadata: { contentType: 'application/json' }, onlyIf: { etagDoesNotMatch: '*' } })) !== null;
@@ -36,6 +36,16 @@ async function rpc(env, method, params) {
 }
 
 export const methods = {
+  /** Alamat kontrak aktif dari portal admin (worker sudah memverifikasi on-chain: ada kode & owner = admin). */
+  async setConfig(env, cfg) {
+    const ok = (a) => /^0x[0-9a-fA-F]{40}$/.test(String(a));
+    if (![84532, 8453].includes(Number(cfg.chainId)) || !ok(cfg.auctionHouse) || !ok(cfg.sale) || !ok(cfg.usdc)) return { error: 'config' };
+    const v = { chainId: Number(cfg.chainId), auctionHouse: cfg.auctionHouse, sale: cfg.sale, usdc: cfg.usdc, rpc: String(cfg.rpc), at: Date.now() };
+    await env.VAULT_STORE.put('cfg.json', JSON.stringify(v), { httpMetadata: { contentType: 'application/json' } });
+    await log(env.VAULT_STORE, 'config', v);
+    return { ok: true };
+  },
+
   signerAddress(env) {
     return { address: addressOf(env.SIGNER_KEY) };
   },

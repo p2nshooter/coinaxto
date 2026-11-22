@@ -4,7 +4,7 @@
  * dan daftar metode yang diizinkan. Logika metode ada di ./methods.js (bisa diuji di Node tanpa runtime Cloudflare).
  */
 import { WorkerEntrypoint } from 'cloudflare:workers';
-import { methods, ALLOWED, log } from './methods.js';
+import { methods, ALLOWED, log, read } from './methods.js';
 
 const enc = new TextEncoder();
 async function verifyMac(env, method, ts, body, mac) {
@@ -22,7 +22,9 @@ export class Vault extends WorkerEntrypoint {
       return { error: 'denied' };
     }
     try {
-      return await methods[method].call(methods, this.env, JSON.parse(body));
+      const cfg = await read(this.env.VAULT_STORE, 'cfg.json');
+      const env = cfg ? { ...this.env, CHAIN_ID: String(cfg.chainId), AUCTION_HOUSE: cfg.auctionHouse, AXTO_SALE: cfg.sale, USDC: cfg.usdc, BASE_RPC: cfg.rpc } : this.env;
+      return await methods[method].call(methods, env, JSON.parse(body));
     } catch (e) {
       await log(this.env.VAULT_STORE, 'error', { method, e: String(e).slice(0, 500) });
       return { error: 'internal' };
