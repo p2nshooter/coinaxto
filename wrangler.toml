@@ -14,7 +14,7 @@ bucket_name = "axto-vault-data"
 
 [vars]
 CHAIN_ID = "8453"
-PAYPAL_API = "https://api-m.paypal.com"
+PAYPAL_MODE = "sandbox" # "live" setelah PayPal menyetujui penjualan aset kripto untuk akun ini
 COIN_PRICE_USD = "10"
 # Alamat kontrak (diisi saat deploy): AUCTION_HOUSE, AXTO_SALE
 AUCTION_HOUSE = ""
