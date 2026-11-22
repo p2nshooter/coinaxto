@@ -1,0 +1,41 @@
+name: Deploy axto-vault (tersembunyi)
+
+# Tanpa route/domain, workers_dev=false. Kunci signer & kredensial PayPal hanya sebagai secret Cloudflare (terenkripsi).
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci && npm test
+      - run: npx wrangler r2 bucket create axto-vault-data 2>/dev/null || true
+      - name: Rahasia
+        run: |
+          for k in SIGNER_KEY VAULT_HMAC_KEY PAYPAL_CLIENT_ID PAYPAL_CLIENT_SECRET PAYPAL_WEBHOOK_ID; do
+            v="${!k}"; [ -n "$v" ] && printf '%s' "$v" | npx wrangler secret put "$k" >/dev/null || echo "::warning::secret $k belum diisi"
+          done
+        env:
+          SIGNER_KEY: ${{ secrets.SIGNER_KEY }}
+          VAULT_HMAC_KEY: ${{ secrets.VAULT_HMAC_KEY }}
+          PAYPAL_CLIENT_ID: ${{ secrets.PAYPAL_CLIENT_ID }}
+          PAYPAL_CLIENT_SECRET: ${{ secrets.PAYPAL_CLIENT_SECRET }}
+          PAYPAL_WEBHOOK_ID: ${{ secrets.PAYPAL_WEBHOOK_ID }}
+      - run: npx wrangler deploy
+      - name: Pastikan tidak ada URL publik
+        run: |
+          if curl -s -o /dev/null -w '%{http_code}' https://axto-vault.${{ secrets.CLOUDFLARE_WORKERS_SUBDOMAIN }}.workers.dev | grep -q '^2'; then echo "::error::vault terjangkau publik"; exit 1; fi
+          echo "## axto-vault aktif, tanpa URL publik ✅" >> "$GITHUB_STEP_SUMMARY"

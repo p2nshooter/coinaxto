@@ -1,0 +1,26 @@
+# axto-vault — worker tersembunyi: TANPA route, TANPA domain, workers_dev = false → tidak punya URL publik.
+# Hanya bisa dipanggil lewat Service Binding dari axto-web (entrypoint "Vault") + HMAC per pesan.
+# Penyimpanan: R2 saja (aturan pemilik: jangan pernah D1).
+name = "axto-vault"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = false
+preview_urls = false
+
+[[r2_buckets]]
+binding = "VAULT_STORE"
+bucket_name = "axto-vault-data"
+
+[vars]
+CHAIN_ID = "8453"
+PAYPAL_API = "https://api-m.paypal.com"
+COIN_PRICE_USD = "10"
+# Alamat kontrak (diisi saat deploy): AUCTION_HOUSE, AXTO_SALE
+AUCTION_HOUSE = ""
+AXTO_SALE = ""
+BASE_RPC = "https://mainnet.base.org"
+USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+# Rahasia (wrangler secret put — terenkripsi di Cloudflare, tidak pernah di repo):
+#   SIGNER_KEY (kunci privat signer attestasi/voucher), VAULT_HMAC_KEY,
+#   PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET, PAYPAL_WEBHOOK_ID
