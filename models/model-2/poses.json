@@ -1,0 +1,33 @@
+{
+  "id": "model-2",
+  "poses": [
+    {
+      "file": "p1",
+      "src": "c55d96df-image.webp",
+      "ar": 0.7667,
+      "cx": 0.42,
+      "chin": 0.692
+    },
+    {
+      "file": "p2",
+      "src": "bdd30627-image.webp",
+      "ar": 0.5278,
+      "cx": 0.466,
+      "chin": 0.76
+    },
+    {
+      "file": "p3",
+      "src": "cba9a408-image.webp",
+      "ar": 0.65,
+      "cx": 0.516,
+      "chin": 0.76
+    },
+    {
+      "file": "p4",
+      "src": "dd619762-image.webp",
+      "ar": 0.6625,
+      "cx": 0.532,
+      "chin": 0.747
+    }
+  ]
+}

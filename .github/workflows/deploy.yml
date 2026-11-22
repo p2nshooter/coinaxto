@@ -35,6 +35,14 @@ jobs:
           PAYPAL_CLIENT_SECRET: ${{ secrets.PAYPAL_CLIENT_SECRET }}
           PAYPAL_WEBHOOK_ID: ${{ secrets.PAYPAL_WEBHOOK_ID }}
       - run: npx wrangler deploy
+      - name: Potret model (privat) → R2 axto-data/model/
+        run: |
+          npx wrangler r2 bucket create axto-data 2>/dev/null || true
+          for f in models/*/*.webp; do
+            id=$(basename "$(dirname "$f")"); name=$(basename "$f")
+            npx wrangler r2 object put "axto-data/model/$id/$name" --file "$f" --content-type image/webp --remote >/dev/null
+          done
+          echo "Potret model diunggah: $(ls models/*/*.webp | wc -l) berkas" >> "$GITHUB_STEP_SUMMARY"
       - name: Pastikan tidak ada URL publik
         run: |
           if curl -s -o /dev/null -w '%{http_code}' https://axto-vault.${{ secrets.CLOUDFLARE_WORKERS_SUBDOMAIN }}.workers.dev | grep -q '^2'; then echo "::error::vault terjangkau publik"; exit 1; fi
