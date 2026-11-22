@@ -44,6 +44,7 @@ jobs:
       - name: Potret model (privat) → R2 axto-nft-data/model/
         run: |
           npx wrangler r2 bucket create axto-nft-data 2>/dev/null || true
+          ls models/*/*.webp >/dev/null 2>&1 || { echo "tidak ada potret di repo (sudah di R2)"; exit 0; }
           for f in models/*/*.webp; do
             id=$(basename "$(dirname "$f")"); name=$(basename "$f")
             npx wrangler r2 object put "axto-nft-data/model/$id/$name" --file "$f" --content-type image/webp --remote >/dev/null
