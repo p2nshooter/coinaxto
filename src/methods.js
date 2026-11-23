@@ -9,10 +9,10 @@
  *  - paypalWebhook: diverifikasi ke PayPal (verify-webhook-signature) sebelum dipakai.
  *  - mintVoucher (WD eksklusif): kustodi R2 dicek pemiliknya; satu voucher per token.
  */
-import { domain, bidHash, resultHash, coinHash, mintHash, sign, recover, keccak, bytesToHex, addressOf } from './sign.js';
+import { domain, bidHash, resultHash, coinHash, mintHash, mintBatchHash, sign, recover, keccak, bytesToHex, addressOf } from './sign.js';
 
 const enc = new TextEncoder();
-export const ALLOWED = new Set(['setConfig', 'attestResult', 'isSettled', 'paypalCreateOrder', 'paypalCapture', 'paypalWebhook', 'mintVoucher', 'signerAddress']);
+export const ALLOWED = new Set(['setConfig', 'attestResult', 'isSettled', 'paypalCreateOrder', 'paypalCapture', 'paypalWebhook', 'mintVoucher', 'mintBatchVoucher', 'signerAddress']);
 const isAddr = (a) => /^0x[0-9a-fA-F]{40}$/.test(String(a));
 
 export const createOnce = async (B, key, v) => (await B.put(key, JSON.stringify(v), { httpMetadata: { contentType: 'application/json' }, onlyIf: { etagDoesNotMatch: '*' } })) !== null;
@@ -39,8 +39,11 @@ export const methods = {
   /** Alamat kontrak aktif dari portal admin (worker sudah memverifikasi on-chain: ada kode & owner = admin). */
   async setConfig(env, cfg) {
     const ok = (a) => /^0x[0-9a-fA-F]{40}$/.test(String(a));
-    if (![84532, 8453].includes(Number(cfg.chainId)) || !ok(cfg.auctionHouse) || !ok(cfg.sale) || !ok(cfg.usdc)) return { error: 'config' };
-    const v = { chainId: Number(cfg.chainId), auctionHouse: cfg.auctionHouse, sale: cfg.sale, usdc: cfg.usdc, rpc: String(cfg.rpc), at: Date.now() };
+    // desain akhir 23 Nov 2026 (edisi ERC-1155): AuctionHouse/AxtoSale tidak dideploy lagi → boleh kosong bila standard = erc1155
+    const editions = cfg.standard === 'erc1155';
+    if (![84532, 8453].includes(Number(cfg.chainId)) || !ok(cfg.usdc)) return { error: 'config' };
+    if (!editions && (!ok(cfg.auctionHouse) || !ok(cfg.sale))) return { error: 'config' };
+    const v = { chainId: Number(cfg.chainId), standard: editions ? 'erc1155' : 'erc721', auctionHouse: editions ? null : cfg.auctionHouse, sale: editions ? null : cfg.sale, usdc: cfg.usdc, rpc: String(cfg.rpc), at: Date.now() };
     await env.VAULT_STORE.put('cfg.json', JSON.stringify(v), { httpMetadata: { contentType: 'application/json' } });
     await log(env.VAULT_STORE, 'config', v);
     return { ok: true };
@@ -147,6 +150,35 @@ export const methods = {
     v.sig = sign(mintHash(domain(collectionName, Number(env.CHAIN_ID), collection), v), env.SIGNER_KEY);
     if (!(await createOnce(env.VAULT_STORE, key, v))) return read(env.VAULT_STORE, key);
     await log(env.VAULT_STORE, 'wd', { collection, tokenId, to: owner });
+    return v;
+  },
+
+  /**
+   * WD eksklusif edisi (AxtoEditions, desain akhir 23 Nov 2026): satuan atau massal dalam SATU voucher → satu transaksi,
+   * gas lebih hemat. axto-web lebih dulu mengurangi kustodi member (R2) lalu meminta voucher dengan `wdRef` unik;
+   * permintaan ulang dengan wdRef yang sama mengembalikan voucher yang sama (tidak pernah dua voucher untuk satu WD).
+   */
+  async mintBatchVoucher(env, { collection, collectionName, items, owner, wdRef }) {
+    if (!isAddr(collection) || !isAddr(owner)) return { error: 'address' };
+    if (!Array.isArray(items) || items.length < 1 || items.length > 50) return { error: 'items' };
+    if (typeof wdRef !== 'string' || !/^[0-9a-z:_-]{8,80}$/.test(wdRef)) return { error: 'ref' };
+    const ids = [];
+    const amounts = [];
+    for (const it of items) {
+      const id = Number(it.id);
+      const a = Number(it.amount);
+      if (!Number.isSafeInteger(id) || id < 1 || !Number.isSafeInteger(a) || a < 1 || a > 10) return { error: 'item' };
+      ids.push(String(id));
+      amounts.push(String(a));
+    }
+    const ref = bytesToHex(keccak(`wd:${wdRef}`));
+    const key = `wd/batch/${collection.toLowerCase()}/${ref}.json`;
+    const prev = await read(env.VAULT_STORE, key);
+    if (prev) return prev.to.toLowerCase() === owner.toLowerCase() ? prev : { error: 'withdrawn' };
+    const v = { to: owner, ids, amounts, ref, deadline: String(Math.floor(Date.now() / 1000) + 14 * 86400) };
+    v.sig = sign(mintBatchHash(domain(collectionName, Number(env.CHAIN_ID), collection), v), env.SIGNER_KEY);
+    if (!(await createOnce(env.VAULT_STORE, key, v))) return read(env.VAULT_STORE, key);
+    await log(env.VAULT_STORE, 'wd', { collection, ids, amounts, to: owner, wdRef });
     return v;
   },
 };

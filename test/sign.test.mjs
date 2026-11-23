@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ethers } from 'ethers';
-import { domain, resultHash, coinHash, mintHash, bidHash, sign, recover, addressOf, bytesToHex } from '../src/sign.js';
+import { domain, resultHash, coinHash, mintHash, mintBatchHash, bidHash, sign, recover, addressOf, bytesToHex } from '../src/sign.js';
 
 const key = ethers.Wallet.createRandom();
 const AH = '0x1111111111111111111111111111111111111111';
@@ -31,4 +31,17 @@ test('CoinVoucher & MintVoucher & Bid: hash identik dengan ethers', async () => 
   const b = { lotId: ethers.id('axto:time:1'), collection: AH, tokenId: 1n, currency: AH, maxAmount: 100n, nonce: 5n, deadline: 1900000000n };
   const sig = await key.signTypedData(ah, types, b);
   assert.equal(recover(bidHash(domain(ah.name, 8453, AH), b), sig).toLowerCase(), key.address.toLowerCase());
+});
+
+test('MintVoucher edisi (WD satuan/massal): hash identik dengan ethers & kontrak AxtoEditions, tanda tangan pulih', () => {
+  const col = { name: "AXTO Exclusive Qur'an", version: '1', chainId: 8453, verifyingContract: AH };
+  const types = { MintVoucher: [{ name: 'to', type: 'address' }, { name: 'ids', type: 'uint256[]' }, { name: 'amounts', type: 'uint256[]' }, { name: 'ref', type: 'bytes32' }, { name: 'deadline', type: 'uint256' }] };
+  for (const v of [
+    { to: key.address, ids: ['7'], amounts: ['1'], ref: ethers.id('wd:a'), deadline: '1900000000' },
+    { to: key.address, ids: ['7', '42', '9999'], amounts: ['3', '1', '10'], ref: ethers.id('wd:b'), deadline: '1900000000' },
+  ]) {
+    const h = mintBatchHash(domain(col.name, 8453, AH), v);
+    assert.equal(bytesToHex(h), ethers.TypedDataEncoder.hash(col, types, v));
+    assert.equal(ethers.verifyTypedData(col, types, v, sign(h, key.privateKey)), key.address);
+  }
 });
