@@ -36,6 +36,8 @@ test('mintBatchVoucher: masukan buruk ditolak', async () => {
   const e = env();
   const base = { collection: COL, collectionName: 'X', owner: ME, wdRef: 'wd-member1-0002' };
   assert.deepEqual(await methods.mintBatchVoucher(e, { ...base, items: [] }), { error: 'items' });
+  // WD massal hemat gas (pemilik 24 Nov 2026): sampai 200 karya per transaksi, lebih dari itu ditolak
+  assert.deepEqual(await methods.mintBatchVoucher(e, { ...base, items: Array.from({ length: 201 }, (_, i) => ({ id: i + 1, amount: 1 })) }), { error: 'items' });
   assert.deepEqual(await methods.mintBatchVoucher(e, { ...base, items: [{ id: 1, amount: 11 }] }), { error: 'item' });
   assert.deepEqual(await methods.mintBatchVoucher(e, { ...base, items: [{ id: 0, amount: 1 }] }), { error: 'item' });
   assert.deepEqual(await methods.mintBatchVoucher(e, { ...base, items: [{ id: 1, amount: 1 }], wdRef: 'x' }), { error: 'ref' });

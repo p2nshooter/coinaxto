@@ -160,7 +160,7 @@ export const methods = {
    */
   async mintBatchVoucher(env, { collection, collectionName, items, owner, wdRef }) {
     if (!isAddr(collection) || !isAddr(owner)) return { error: 'address' };
-    if (!Array.isArray(items) || items.length < 1 || items.length > 50) return { error: 'items' };
+    if (!Array.isArray(items) || items.length < 1 || items.length > 200) return { error: 'items' }; // WD massal hemat gas (pemilik 24 Nov 2026): maks. 200 karya per transaksi
     if (typeof wdRef !== 'string' || !/^[0-9a-z:_-]{8,80}$/.test(wdRef)) return { error: 'ref' };
     const ids = [];
     const amounts = [];
